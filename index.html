@@ -1,0 +1,329 @@
+import { useState, useEffect, useRef } from “react”;
+
+const SHARED = true;
+const STORAGE_KEY = “anon-wall-posts”;
+
+const glitchChars = “!@#$%^&*<>?/\|~`”;
+
+function glitch(text) {
+return text
+.split(””)
+.map((c) =>
+Math.random() < 0.04
+? glitchChars[Math.floor(Math.random() * glitchChars.length)]
+: c
+)
+.join(””);
+}
+
+function timeAgo(ts) {
+const diff = Math.floor((Date.now() - ts) / 1000);
+if (diff < 60) return `${diff}s ago`;
+if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+return `${Math.floor(diff / 86400)}d ago`;
+}
+
+const REACTIONS = [“🔥”, “👻”, “💀”, “❤️”, “😂”];
+
+export default function AnonymousWall() {
+const [posts, setPosts] = useState([]);
+const [input, setInput] = useState(””);
+const [sending, setSending] = useState(false);
+const [glitchActive, setGlitchActive] = useState(false);
+const [titleText, setTitleText] = useState(“ANONYMOUS WALL”);
+const postsEndRef = useRef(null);
+const inputRef = useRef(null);
+
+// Load posts from shared storage
+const loadPosts = async () => {
+try {
+const result = await window.storage.get(STORAGE_KEY, SHARED);
+if (result) setPosts(JSON.parse(result.value));
+} catch {
+// no posts yet
+}
+};
+
+// Save posts to shared storage
+const savePosts = async (newPosts) => {
+try {
+await window.storage.set(STORAGE_KEY, JSON.stringify(newPosts), SHARED);
+} catch (e) {
+console.error(e);
+}
+};
+
+useEffect(() => {
+loadPosts();
+const interval = setInterval(loadPosts, 4000);
+return () => clearInterval(interval);
+}, []);
+
+// Glitch title effect
+useEffect(() => {
+const glitchLoop = setInterval(() => {
+setGlitchActive(true);
+let count = 0;
+const fast = setInterval(() => {
+setTitleText(glitch(“ANONYMOUS WALL”));
+count++;
+if (count > 6) {
+clearInterval(fast);
+setTitleText(“ANONYMOUS WALL”);
+setGlitchActive(false);
+}
+}, 60);
+}, 3500);
+return () => clearInterval(glitchLoop);
+}, []);
+
+const sendPost = async () => {
+if (!input.trim() || sending) return;
+setSending(true);
+
+```
+const newPost = {
+  id: Date.now().toString(),
+  text: input.trim(),
+  time: Date.now(),
+  reactions: {},
+};
+
+const updated = [newPost, ...posts];
+setPosts(updated);
+await savePosts(updated);
+setInput("");
+setSending(false);
+setTimeout(() => postsEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+```
+
+};
+
+const handleReact = async (postId, emoji) => {
+const updated = posts.map((p) => {
+if (p.id !== postId) return p;
+const count = (p.reactions?.[emoji] || 0) + 1;
+return { …p, reactions: { …p.reactions, [emoji]: count } };
+});
+setPosts(updated);
+await savePosts(updated);
+};
+
+return (
+<div style={{
+minHeight: “100vh”,
+background: “#0a0a0a”,
+fontFamily: “‘Courier New’, Courier, monospace”,
+color: “#e0e0e0”,
+display: “flex”,
+flexDirection: “column”,
+}}>
+{/* Scanlines overlay */}
+<div style={{
+position: “fixed”, inset: 0, pointerEvents: “none”, zIndex: 999,
+backgroundImage: “repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px)”,
+}} />
+
+```
+  {/* Header */}
+  <div style={{
+    position: "sticky", top: 0, zIndex: 10,
+    borderBottom: "2px solid #ff2d55",
+    background: "rgba(10,10,10,0.95)",
+    backdropFilter: "blur(8px)",
+    padding: "18px 24px",
+    display: "flex", alignItems: "center", gap: 16,
+  }}>
+    <div style={{
+      width: 12, height: 12, borderRadius: "50%",
+      background: "#ff2d55",
+      boxShadow: "0 0 12px #ff2d55",
+      animation: "pulse 1.5s infinite",
+    }} />
+    <span style={{
+      fontSize: 20,
+      fontWeight: 900,
+      letterSpacing: "0.3em",
+      color: glitchActive ? "#ff2d55" : "#fff",
+      textShadow: glitchActive ? "2px 0 #0ff, -2px 0 #f0f" : "none",
+      transition: "color 0.1s",
+      userSelect: "none",
+    }}>
+      {titleText}
+    </span>
+    <span style={{
+      marginLeft: "auto",
+      fontSize: 12,
+      color: "#555",
+      letterSpacing: "0.1em",
+    }}>
+      {posts.length} posts
+    </span>
+  </div>
+
+  {/* Feed */}
+  <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 120px" }}>
+    {posts.length === 0 && (
+      <div style={{
+        textAlign: "center", color: "#333", marginTop: 80,
+        fontSize: 14, letterSpacing: "0.2em",
+      }}>
+        [ NO TRANSMISSIONS YET ]<br />
+        <span style={{ fontSize: 11, color: "#222" }}>be the first ghost</span>
+      </div>
+    )}
+
+    {posts.map((post, i) => (
+      <PostCard
+        key={post.id}
+        post={post}
+        index={i}
+        onReact={handleReact}
+      />
+    ))}
+    <div ref={postsEndRef} />
+  </div>
+
+  {/* Input */}
+  <div style={{
+    position: "fixed", bottom: 0, left: 0, right: 0,
+    background: "rgba(10,10,10,0.97)",
+    borderTop: "1px solid #1a1a1a",
+    padding: "12px 16px",
+    display: "flex", gap: 10,
+    backdropFilter: "blur(10px)",
+  }}>
+    <input
+      ref={inputRef}
+      value={input}
+      onChange={(e) => setInput(e.target.value)}
+      onKeyDown={(e) => e.key === "Enter" && sendPost()}
+      placeholder="transmit anonymously..."
+      maxLength={280}
+      style={{
+        flex: 1,
+        background: "#111",
+        border: "1px solid #222",
+        borderRadius: 4,
+        padding: "12px 14px",
+        color: "#fff",
+        fontFamily: "'Courier New', monospace",
+        fontSize: 14,
+        outline: "none",
+        transition: "border-color 0.2s",
+      }}
+      onFocus={(e) => (e.target.style.borderColor = "#ff2d55")}
+      onBlur={(e) => (e.target.style.borderColor = "#222")}
+    />
+    <button
+      onClick={sendPost}
+      disabled={sending || !input.trim()}
+      style={{
+        background: input.trim() ? "#ff2d55" : "#1a1a1a",
+        color: input.trim() ? "#fff" : "#444",
+        border: "none",
+        borderRadius: 4,
+        padding: "12px 20px",
+        fontFamily: "'Courier New', monospace",
+        fontSize: 13,
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        cursor: input.trim() ? "pointer" : "default",
+        transition: "all 0.2s",
+      }}
+    >
+      {sending ? "..." : "SEND"}
+    </button>
+  </div>
+
+  <style>{`
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `}</style>
+</div>
+```
+
+);
+}
+
+function PostCard({ post, index, onReact }) {
+const [hovered, setHovered] = useState(false);
+
+const totalReactions = Object.values(post.reactions || {}).reduce((a, b) => a + b, 0);
+
+return (
+<div
+onMouseEnter={() => setHovered(true)}
+onMouseLeave={() => setHovered(false)}
+style={{
+background: hovered ? “#111” : “#0d0d0d”,
+border: “1px solid”,
+borderColor: hovered ? “#ff2d55” : “#1a1a1a”,
+borderRadius: 6,
+padding: “14px 16px”,
+marginBottom: 10,
+animation: “fadeSlide 0.3s ease forwards”,
+animationDelay: `${Math.min(index * 0.03, 0.3)}s`,
+opacity: 0,
+transition: “border-color 0.2s, background 0.2s”,
+position: “relative”,
+}}
+>
+{/* Top bar */}
+<div style={{
+display: “flex”, justifyContent: “space-between”,
+marginBottom: 10, fontSize: 11, color: “#333”,
+letterSpacing: “0.1em”,
+}}>
+<span style={{ color: “#ff2d55” }}>👤 GHOST_{post.id.slice(-4)}</span>
+<span>{timeAgo(post.time)}</span>
+</div>
+
+```
+  {/* Text */}
+  <div style={{
+    fontSize: 15,
+    lineHeight: 1.6,
+    color: "#ddd",
+    wordBreak: "break-word",
+  }}>
+    {post.text}
+  </div>
+
+  {/* Reactions */}
+  <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+    {REACTIONS.map((emoji) => {
+      const count = post.reactions?.[emoji] || 0;
+      return (
+        <button
+          key={emoji}
+          onClick={() => onReact(post.id, emoji)}
+          style={{
+            background: count > 0 ? "rgba(255,45,85,0.12)" : "transparent",
+            border: `1px solid ${count > 0 ? "#ff2d55" : "#1f1f1f"}`,
+            borderRadius: 20,
+            padding: "3px 10px",
+            fontSize: 13,
+            cursor: "pointer",
+            color: count > 0 ? "#fff" : "#444",
+            display: "flex", alignItems: "center", gap: 4,
+            transition: "all 0.15s",
+          }}
+        >
+          {emoji} {count > 0 && <span style={{ fontSize: 11, color: "#ff2d55" }}>{count}</span>}
+        </button>
+      );
+    })}
+  </div>
+</div>
+```
+
+);
+}
